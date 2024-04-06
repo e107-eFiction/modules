@@ -3,7 +3,7 @@
 
 ## storybanner module
 
-This module adds banner field for story and series. Simple oneline text field for full path to image.
+This module adds a banner field for stories and series. Simple one-line text field for the full path to the image.
 
 To use it in skin:
 
@@ -16,7 +16,7 @@ Templates:
 `{seriesbanner}`  - insert image with HTML img tag
 
 `{seriesbanner_src} `- return only image path
-`{seriesbanner_title}` - return title of serie in format for alt tag
+`{seriesbanner_title}` - return the title of the series in format for the alt tag
 
 Example:
 `<img src="{seriesbanner_src}" class="rounded mx-auto d-block" alt="{seriesbanner_title}">`
@@ -32,7 +32,7 @@ Templates:
 `{storybanner} ` - insert image with HTML img tag
 
 `{storybanner_src}` - return only image path
-`{storybanner_title}` - return title of serie in format for alt tag
+`{storybanner_title}` - return the title of story in format for the alt tag
 
 Example:
 `<img src="{storybanner_src}" class="rounded mx-auto d-block" alt="{storybanner_title}">`
