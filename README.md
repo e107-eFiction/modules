@@ -1,5 +1,9 @@
 # Modules for efiction CMS
  
+## notification module
+
+This module is part of 3.5.8 version, this is just backup. 
+You need files from 3.5.8 version to get it works.
 
 ## storybanner module
 
