@@ -44,10 +44,9 @@ if($storyend['display_authorinfo']) {
 	$authors[] = $storyinfo['uid'];
 	if (!empty($storyinfo['coauthors']))
 	{
-		$coauth = dbquery("SELECT uid FROM " . TABLEPREFIX . "fanfiction_coauthors WHERE sid = '" . $storyinfo['sid'] . "'");
-		while ($c = dbassoc($coauth))
+		foreach($storyinfo['coauthors_array'] AS $c=>$coauth)
 		{
-			$authors[] = $c['uid'];
+			$authors[] = $c;
 		}
 	}
 
@@ -60,7 +59,8 @@ if($storyend['display_authorinfo']) {
 	while($a2 = dbassoc($aquery)) {
 		$alist[] = sprintf(_AUTHORCOUNT, "<a href='viewuser.php?uid=".$a2['uid']."'>".$a2['penname']."</a>", ($a2['stories'] - 1));
 	}
-	var_dump($storyinfo );
+
+ 
 	if(is_array($alist)) {
 		$storyendcode->assign("authorcount", implode("<br />", $alist));
 	}
