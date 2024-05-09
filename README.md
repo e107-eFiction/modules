@@ -42,3 +42,11 @@ Example:
 `<img src="{storybanner_src}" class="rounded mx-auto d-block" alt="{storybanner_title}">`
 or 
 `{storybanner}`
+
+## storyend module
+
+Templates:
+- viewstory.tpl
+- storyend.tpl
+
+`{storyend}`  
