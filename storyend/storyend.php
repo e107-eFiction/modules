@@ -94,16 +94,16 @@ if ($storyend['display_seriesinfo'])
 		$thisSeries = sprintf(_SE_INSERIES, "<a href='"._BASEDIR."viewseries.php?seriesid=".$series['seriesid']."'>".stripslashes($series['title'])."</a>");
 		$others = dbquery("SELECT subseriesid, sid, inorder FROM ".TABLEPREFIX."fanfiction_inseries WHERE seriesid = '".$series['seriesid']."' AND confirmed = 1 AND (inorder = ".($series['inorder'] - 1)." OR inorder = ".($series['inorder'] + 1).")"); 
 		while($o = dbassoc($others)) {
-			unset($storydata, $sub);
-			if(!empty($o['sid'])) $storydata = dbassoc(dbquery(_STORYQUERY." AND sid = ".$o['sid']." LIMIT 1"));
+			unset($sibling, $sub);
+			if(!empty($o['sid'])) $sibling = dbassoc(dbquery(_STORYQUERY." AND sid = ".$o['sid']." LIMIT 1"));
 			elseif(!empty($o['subseriesid'])) $sub = dbassoc(dbquery(_SERIESQUERY." AND seriesid = ".$o['seriesid']));
 			
 			if($o['inorder'] < $series['inorder']) {
-				if($storydata) $thisSeries .= " ".sprintf(_SE_SERIES_PREVST, title_link($storydata));
+				if($sibling) $thisSeries .= " ".sprintf(_SE_SERIES_PREVST, title_link($sibling));
 				elseif($sub) $thisSeries .= " ".sprintf(_SE_SERIES_PREVSE, "<a href='"._BASEDIR."viewseries.php?seriesid=".$sub['seriesid']."'>".stripslashes($sub['title'])."</a>");
 			}
 			elseif ($o['inorder'] > $series['inorder']) {
-				if($storydata) $thisSeries .= " ".sprintf(_SE_SERIES_NEXTST, title_link($storydata));
+				if($sibling) $thisSeries .= " ".sprintf(_SE_SERIES_NEXTST, title_link($sibling));
 				elseif($sub) $thisSeries .= " ".sprintf(_SE_SERIES_NEXTSE, "<a href='"._BASEDIR."viewseries.php?seriesid=".$sub['seriesid']."'>".stripslashes($sub['title'])."</a>");
 			}
 			
