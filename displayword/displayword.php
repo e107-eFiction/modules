@@ -38,11 +38,15 @@ if(!defined("_BASEDIR")) define("_BASEDIR", $folder_level);
 @include_once(_BASEDIR."config.php");
 $output = "";
 
+
 $settingsresults = dbquery("SELECT * FROM ".$settingsprefix."fanfiction_settings WHERE sitekey = '".$sitekey."'");
 $settings = dbassoc($settingsresults);
 foreach($settings as $var => $val) {
+	if (is_NULL($val)) $val = '';
 	$$var = stripslashes($val);
+	$settings[$var] = htmlspecialchars($val);
 }
+
 $debug = 0;
 define("TABLEPREFIX", $tableprefix);
 define("STORIESPATH", $storiespath);
@@ -56,6 +60,10 @@ if(isset($_GET['skin'])) {
 	$_SESSION[$sitekey."_skin"] = $skin;
 }
 
+// Defines the character set for your language/location
+if (!defined('_CHARSET')) {
+    define('_CHARSET', 'utf-8');
+}
 
 if(is_dir(_BASEDIR."skins/$skin")) $skindir = _BASEDIR."skins/$skin";
 else $skindir = _BASEDIR."default_tpls";
