@@ -32,8 +32,9 @@ if(!isADMIN) accessDenied( );
 $confirm = isset($_GET['confirm']) ? $_GET['confirm'] : false;
 if($confirm == "yes") {
 
-	$check = dbassoc(dbquery("SHOW COLUMNS FROM " . TABLEPREFIX . "fanfiction_settings LIKE 'storyend'"));
-	if (!$check) dbquery("ALTER TABLE `" . TABLEPREFIX . "fanfiction_settings` ADD `storyend` TEXT NOT NULL default ''");
+	// the settings table uses $settingsprefix (see header.php), which can differ from TABLEPREFIX
+	$check = dbassoc(dbquery("SHOW COLUMNS FROM " . $settingsprefix . "fanfiction_settings LIKE 'storyend'"));
+	if (!$check) dbquery("ALTER TABLE `" . $settingsprefix . "fanfiction_settings` ADD `storyend` TEXT NOT NULL default ''");
 
 	dbquery("INSERT INTO `".TABLEPREFIX."fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storyend/storyend.php\");', 'storyend', 'storyend');");
 	dbquery("INSERT INTO `".TABLEPREFIX."fanfiction_panels` (`panel_name`, `panel_title`, `panel_url`, `panel_level`, `panel_order`, `panel_hidden`, `panel_type`) VALUES ('alsolike', 'Also Like', 'modules/storyend/alsolike.php', 0, 0, 1, 'B');");

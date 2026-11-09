@@ -49,7 +49,6 @@ if($confirm == "yes") {
 	 
 
 		dbquery("INSERT INTO `" . TABLEPREFIX . "fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storybanner/viewstory.php\");', 'storyblock', 'storybanner');");
-		dbquery("INSERT INTO `" . TABLEPREFIX . "fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storybanner/viewstory.php\");', 'storyblock', 'storybanner');");
 
 		dbquery("INSERT INTO `" . TABLEPREFIX . "fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storybanner/editseries.php\");', 'editseries', 'storybanner');");
 		dbquery("INSERT INTO `" . TABLEPREFIX . "fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storybanner/addseries.php\");', 'addseries', 'storybanner');");

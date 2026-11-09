@@ -13,3 +13,17 @@ part of with links to the previous and next parts of the series.
 05/16/24
 
 - options page
+
+11/09/26 - 1.8
+
+- Options are stored as JSON with exactly three keys (display_authorinfo,
+display_favouritesinfo, display_seriesinfo), each 0 or 1; values saved with
+serialize() by 1.4 - 1.7 are still read (without objects) and converted by update.php.
+- No saved options means all three blocks are shown (the admin form shows the same).
+- install.php and update.php use $settingsprefix for the settings table.
+- update.php takes 1.0 - 1.7 to 1.8 in one run and says "already updated" afterwards.
+- Co-authors are read from coauthors_array when the core provides it, otherwise from
+the co-authors table (official core).
+- Author count shows the number of other stories; pennames and series titles are escaped.
+- Fixed the sub-series lookup in the series block (used a column the query did not select).
+- Removed the Bootstrap class from the default storyend.tpl.

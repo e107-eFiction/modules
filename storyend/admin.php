@@ -27,6 +27,7 @@ if(file_exists(_BASEDIR."languages/{$language}_admin.php")) include_once(_BASEDI
 else include_once(_BASEDIR."languages/en_admin.php");
 if(file_exists(_BASEDIR."modules/storyend/languages/{$language}.php")) include_once(_BASEDIR."modules/storyend/languages/{$language}.php");
 else include_once(_BASEDIR. "modules/storyend/languages/en.php");
+include_once(_BASEDIR."modules/storyend/functions.php");
 
  
  
@@ -35,19 +36,20 @@ if(!isADMIN) accessDenied( );
  
 if(isset($_POST['submit'])) {
  
-	$dbdata =  serialize($_POST['storyend']);
-	$dbdata = addslashes($dbdata); 
-	$result = dbquery("UPDATE ".$settingsprefix."fanfiction_settings SET storyend = '$dbdata' WHERE sitekey = '".SITEKEY."'");
+	// only the three known options, each 0 or 1; anything else in the form is ignored
+	$dbdata = json_encode(storyend_clean_options(isset($_POST['storyend']) && is_array($_POST['storyend']) ? $_POST['storyend'] : array( )));
+	$result = dbquery("UPDATE ".$settingsprefix."fanfiction_settings SET storyend = '".escapestring($dbdata)."' WHERE sitekey = '".SITEKEY."'");
 	if($result) $output .= write_message(_ACTIONSUCCESSFUL);
 	else $output .= write_error(_ERROR);
 }
 else {
  
-	$tmp =  unserialize($storyend);
+	// never saved, empty or unreadable: all options on (as storyend.php shows it)
+	$tmp = storyend_options(isset($storyend) ? $storyend : "");
 
-	$display_authorinfo = isset($tmp['display_authorinfo']) ? $tmp['display_authorinfo'] : "";
-	$display_seriesinfo = isset($tmp['display_seriesinfo']) ? $tmp['display_seriesinfo'] : "";
-	$display_favouritesinfo = isset($tmp['display_favouritesinfo']) ? $tmp['display_favouritesinfo'] : "";
+	$display_authorinfo = (string)$tmp['display_authorinfo'];
+	$display_seriesinfo = (string)$tmp['display_seriesinfo'];
+	$display_favouritesinfo = (string)$tmp['display_favouritesinfo'];
  
 
 	$output .= 
@@ -61,7 +63,7 @@ else {
 					</select>
 				</div>
 				<div style='margin-bottom: 1em'>
-	        		<label for=\"storyend[display_authorinfo]\">Display Series Info: </label> 
+	        		<label for=\"storyend[display_seriesinfo]\">Display Series Info: </label> 
 					<select name=\"storyend[display_seriesinfo]\">
 						<option value=\"1\"" . ($display_seriesinfo == "1" ? " selected" : "") . ">" . _YES . "</option>
 						<option value=\"0\"" . ($display_seriesinfo == "0" ? " selected" : "") . ">" . _NO . "</option>

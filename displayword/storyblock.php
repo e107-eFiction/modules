@@ -27,8 +27,12 @@ if(!defined("_CHARSET")) exit( );
 if($current == "viewstory") {
 	if(file_exists(_BASEDIR."modules/displayword/languages/{$language}.php")) include_once(_BASEDIR."modules/displayword/languages/{$language}.php");
 	else include_once(_BASEDIR."modules/displayword/languages/en.php");
-	if(!empty($chapter) && $chapters > 1) $printword = "<img src='".(isset($wordicon) ? $wordicon : "modules/displayword/images/doc.gif")."' border='0' alt='"._MSWORD."'> <a href=\"modules/displayword/displayword.php?sid=$sid&amp;chapter=$chapter\">"._CHAPTER."</a> "._OR." <a href=\"modules/displayword/displayword.php?sid=$sid&amp;chapter=all\">"._STORY."</a>";
-	else $printword = "<a href=\"modules/displayword/displayword.php?sid=$sid&amp;textsize=$textsize&amp;chapter=1\"><img src='".(isset($wordicon) ? $wordicon : "modules/displayword/images/doc.gif")."' border='0' alt='"._MSWORD."'></a>";
+	// $chapter is the chapter number in a multi-chapter story; on other pages of viewstory.php it can be
+	// "all", the chapter row or unset, and $chapters is only set when the chapters were counted
+	$dw_icon = htmlspecialchars(isset($wordicon) ? $wordicon : "modules/displayword/images/doc.gif", ENT_QUOTES, 'UTF-8');
+	$dw_sid = (int)$sid;
+	if(!empty($chapter) && is_scalar($chapter) && isNumber((string)$chapter) && isset($chapters) && $chapters > 1) $printword = "<img src='".$dw_icon."' border='0' alt='"._MSWORD."'> <a href=\"modules/displayword/displayword.php?sid=$dw_sid&amp;chapter=".(int)$chapter."\">"._CHAPTER."</a> "._OR." <a href=\"modules/displayword/displayword.php?sid=$dw_sid&amp;chapter=all\">"._STORY."</a>";
+	else $printword = "<a href=\"modules/displayword/displayword.php?sid=$dw_sid&amp;textsize=".(isset($textsize) ? (int)$textsize : 0)."&amp;chapter=1\"><img src='".$dw_icon."' border='0' alt='"._MSWORD."'></a>";
 	$tpl->assign("printword", $printword);
 }
 

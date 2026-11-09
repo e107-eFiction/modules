@@ -1,6 +1,5 @@
 <?php
 $current = "";
- error_reporting(E_ALL);
 // Checks that the given $num is actually a number.  Used to help prevent XSS attacks.
 function isNum($num) {
 	if(empty($num)) return false;
@@ -8,16 +7,16 @@ function isNum($num) {
 	return preg_match("/^[0-9]+$/", $num);
 }
 
-// Same with the author list
+// Same with the author list ($stories['coauthors_array'] is uid => penname, loaded below;
+// the coauthors column is only a 0/1 flag, it does not hold the co-authors' ids)
 function author_list($stories) {
-	if($stories['coauthors']) {
-		$authlink[] = $stories['penname'];
-		$coquery = dbquery("SELECT "._PENNAMEFIELD." as penname, "._UIDFIELD." as uid FROM "._AUTHORTABLE." WHERE FIND_IN_SET("._UIDFIELD.", '".$stories['coauthors']."') > 0 ORDER BY "._PENNAMEFIELD);
-		while($co = dbassoc($coquery)) {
-			$authlink[] = $co['penname'];
+	$authlink = array($stories['penname']);
+	if(!empty($stories['coauthors_array']) && is_array($stories['coauthors_array'])) {
+		foreach($stories['coauthors_array'] as $copenname) {
+			$authlink[] = $copenname;
 		}
 	}
-	return isset($authlink) ? implode(", ", $authlink) : $stories['penname'];
+	return implode(", ", $authlink);
 }
 
 $sid = isset($_GET['sid']) && isNum($_GET['sid']) ? $_GET['sid'] : false;
@@ -36,11 +35,14 @@ while (!file_exists($folder_level."header.php")) { $folder_level .= "../"; }
 if(!defined("_BASEDIR")) define("_BASEDIR", $folder_level);
 
 @include_once(_BASEDIR."config.php");
+// since 3.5.8 config.php no longer loads the database functions (header.php does)
+if(!function_exists("dbquery")) include_once(_BASEDIR."includes/dbfunctions.php");
 $output = "";
 
 
 $settingsresults = dbquery("SELECT * FROM ".$settingsprefix."fanfiction_settings WHERE sitekey = '".$sitekey."'");
 $settings = dbassoc($settingsresults);
+if(!is_array($settings)) die("Error");
 foreach($settings as $var => $val) {
 	if (is_NULL($val)) $val = '';
 	$$var = stripslashes($val);
@@ -53,9 +55,11 @@ define("STORIESPATH", $storiespath);
 include_once(_BASEDIR."includes/queries.php");
 session_start( );
 
-if(isset($_SESSION[$sitekey."_skin"])) $skin = $_SESSION[$sitekey."_skin"];
+// a skin name is only used when it is a plain folder name in skins/ (as ef_valid_skin() in the core)
+$skinok = function($name) { return is_string($name) && $name !== "" && basename($name) === $name && is_dir(_BASEDIR."skins/".$name); };
+if(isset($_SESSION[$sitekey."_skin"]) && $skinok($_SESSION[$sitekey."_skin"])) $skin = $_SESSION[$sitekey."_skin"];
 
-if(isset($_GET['skin'])) {
+if(isset($_GET['skin']) && $skinok($_GET['skin'])) {
 	$skin = $_GET['skin'];
 	$_SESSION[$sitekey."_skin"] = $skin;
 }
@@ -65,14 +69,33 @@ if (!defined('_CHARSET')) {
     define('_CHARSET', 'utf-8');
 }
 
-if(is_dir(_BASEDIR."skins/$skin")) $skindir = _BASEDIR."skins/$skin";
+if($skinok($skin)) $skindir = _BASEDIR."skins/$skin";
 else $skindir = _BASEDIR."default_tpls";
 if(file_exists(_BASEDIR."languages/{$language}.php")) require_once (_BASEDIR."languages/{$language}.php");
 else require_once (_BASEDIR."languages/en.php");
 
-if(!empty($sid)) {
+$storyinfo = false;
+// the site is closed for maintenance: only admins may read, and this script always runs as a visitor
+if(!empty($sid) && empty($maintenance)) {
 	$storyquery = dbquery(_STORYQUERY." AND sid = '$sid' LIMIT 1");
 	$storyinfo = dbassoc($storyquery);
+}
+if($storyinfo && !empty($storyinfo['rid'])) {
+	// the same rating checks as viewstory.php, for a visitor: members-only ratings are refused, the age
+	// consent and the rating warning must have been accepted on the site in this session
+	$rating = dbassoc(dbquery("SELECT ratingwarning FROM ".TABLEPREFIX."fanfiction_ratings WHERE rid = '".(int)$storyinfo['rid']."' LIMIT 1"));
+	$warninglevel = sprintf("%03b", $rating ? (int)$rating['ratingwarning'] : 0);
+	if($warninglevel[0] || ($warninglevel[1] && empty($_SESSION[$sitekey."_ageconsent"])) || ($warninglevel[2] && empty($_SESSION[$sitekey."_warned"][$storyinfo['rid']])))
+		$storyinfo = false;
+}
+if($storyinfo) {
+	$storyinfo['coauthors_array'] = array( );
+	if(!empty($storyinfo['coauthors'])) {
+		$coauth = dbquery("SELECT "._PENNAMEFIELD." as penname, co.uid FROM ".TABLEPREFIX."fanfiction_coauthors AS co LEFT JOIN "._AUTHORTABLE." ON co.uid = "._UIDFIELD." WHERE co.sid = '".(int)$sid."'");
+		while($c = dbassoc($coauth)) {
+			$storyinfo['coauthors_array'][$c['uid']] = $c['penname'];
+		}
+	}
 }
 if($storyinfo) {
 	header("Expires: Mon, 26 Jul 2001 05:00:00 GMT");
@@ -82,7 +105,9 @@ if($storyinfo) {
 	header("Pragma: no-cache");
 	header("Cache-control: private");
 	header("Content-type: application/msword");
-	header("Content-Disposition: attachment; filename=".preg_replace(array("/,/", "/\s/"), array("", "_"), $storyinfo['title']."_"._BY."_".author_list($storyinfo))."-".date("MdY").".doc");
+	// no quotes, path separators or control characters in the file name
+	$docname = preg_replace(array('/[\x00-\x1F\x7F"\\\\\/:;*?<>|,]/', '/\s+/'), array('', '_'), strip_tags(stripslashes($storyinfo['title']))."_"._BY."_".author_list($storyinfo));
+	header("Content-Disposition: attachment; filename=\"".$docname."-".date("MdY").".doc\"");
 	echo "<html xmlns:o=\"urn:schemas-microsoft-com:office:office\"
 xmlns:w=\"urn:schemas-microsoft-com:office:word\"
 xmlns=\"http://www.w3.org/TR/REC-html40\">
@@ -90,25 +115,17 @@ xmlns=\"http://www.w3.org/TR/REC-html40\">
 
 <meta http-equiv=Content-Type content=\"text/html; charset="._CHARSET."\">
 <style>";
-	if(file_exists("$skindir/printword.css")) include("$skindir/printword.css");
-	else echo include("default_tpls/printword.css");
+	// a stylesheet is printed as it is, never run as PHP
+	if(file_exists("$skindir/printword.css")) readfile("$skindir/printword.css");
+	else readfile(_BASEDIR."modules/displayword/default_tpls/printword.css");
 echo "</style></head>
 <body>";
 	include (_BASEDIR."includes/class.TemplatePower.inc.php");
-	if(file_exists("$skindir/printstory.tpl")) $tpl = new TemplatePower( "$skindir/printword.tpl" );
+	if(file_exists("$skindir/printword.tpl")) $tpl = new TemplatePower( "$skindir/printword.tpl" );
 	else $tpl = new TemplatePower(_BASEDIR."modules/displayword/default_tpls/printword.tpl");
 	include(_BASEDIR."includes/corefunctions.php");
 	include(_BASEDIR."includes/pagesetup.php");
-	if($storyinfo['coauthors'] == 1) {
-		$coauthors = array();
-		$coauth = dbquery("SELECT "._PENNAMEFIELD." as penname, co.uid FROM ".TABLEPREFIX."fanfiction_coauthors AS co LEFT JOIN "._AUTHORTABLE." ON co.uid = "._UIDFIELD." WHERE co.sid = '".$sid."'");
-		while($c = dbassoc($coauth)) {
-			$coauthors[$c['uid']] = $c['penname'];
-		}
-		$storyinfo['coauthors'] = $coauthors;
-		unset($coauthors);
-	}
-	else $storyinfo['coauthors'] = array();
+	// coauthors stays the 0/1 flag: includes/storyblock.php reads it as one and loads the co-authors itself
 	$stories = $storyinfo;
 	include(_BASEDIR."includes/storyblock.php");
 	$tpl->assign("title", stripslashes($storyinfo['title']));
@@ -116,12 +133,12 @@ echo "</style></head>
 	if(empty($chapter)) $chapter = "all"; // shouldn't happen but just in case
 	unset($stories);
 	if($chapter == "all") {
-		if($storyinfo['storynotes']) {
+		if(!empty($storyinfo['storynotes'])) {
 			$tpl->newBlock("storynotes");
 			$tpl->assign( "storynotes", format_story($storyinfo['storynotes']));
 			$tpl->gotoBlock("_ROOT");
 		}
-		$chapterinfo = dbquery("SELECT *, "._PENNAMEFIELD." as penname FROM (".TABLEPREFIX."fanfiction_chapters as c, "._AUTHORTABLE.") WHERE sid = '$sid' AND c.uid = "._UIDFIELD." ORDER BY inorder");
+		$chapterinfo = dbquery("SELECT *, "._PENNAMEFIELD." as penname FROM (".TABLEPREFIX."fanfiction_chapters as c, "._AUTHORTABLE.") WHERE sid = '$sid' AND c.uid = "._UIDFIELD." AND c.validated > 0 ORDER BY inorder");
 		while($c = dbassoc($chapterinfo)) {
 			$tpl->newBlock("storyindexblock");
 			$tpl->assign("chapternumber", $c['inorder']);
@@ -131,7 +148,7 @@ echo "</style></head>
 			$tpl->newBlock("chapterblock");
 			$tpl->assign("chaptertitle", "<a name='".$c['inorder']."'></a>".$c['title']);
 			$tpl->assign("chapterauthor", $c['penname']);
-			if($c['notes']) {
+			if(!empty($c['notes'])) {
 				$tpl->newBlock("notes");
 				$tpl->assign( "notes", format_story($c['notes']));
 				$tpl->gotoBlock("chapterblock");
@@ -144,17 +161,14 @@ echo "</style></head>
 					exit( );
 				}
 				$file = _BASEDIR.STORIESPATH."/".$c['uid']."/".$c['chapid'].".txt";
-				$log_file = @fopen($file, "r");
-				$file_contents = @fread($log_file, filesize($file));
-				$story = $file_contents;
-				@fclose($log_file);
+				$story = is_file($file) ? (string)@file_get_contents($file) : "";
 			}
 			else $story = $c['storytext'];
 			// The following lines cleans up problems between pre-2.0 stories and 2.0 stories.  If there's html, don't send it through nl2br and then clean up smart quotes.
 			$story = format_story($story);
 			$tpl->assign("chaptertext", $story);	
 			$tpl->assign("back2top", "<a href='#1'>"._BACK2INDEX."</a>");
-			if($c['endnotes']) {
+			if(!empty($c['endnotes'])) {
 				$tpl->newBlock("endnotes");
 				$tpl->assign( "endnotes", format_story($c['endnotes']));
 				$tpl->gotoBlock("chapterblock");
@@ -164,14 +178,14 @@ echo "</style></head>
 	else {
 		$chapterinfo = dbquery("SELECT *, "._PENNAMEFIELD." as penname FROM (".TABLEPREFIX."fanfiction_chapters as c, "._AUTHORTABLE.") WHERE sid = '$sid' AND inorder = '$chapter' AND c.uid = "._UIDFIELD." LIMIT 1");
 		$c = dbassoc($chapterinfo);
-		// if the *CHAPTER* hasn't been validated and the viewer isn't an admin or the author throw them a warning.  
-		if(empty($c['validated']) && !isADMIN && USERUID != $c['uid'] && !in_array($c['uid'], explode(",", $storyinfo['coauthors']))) {
-			$warning = write_error(_ACCESSDENIED);
-			$tpl->assign("output", $warning);
-			$tpl->printToScreen( );
+		// a missing chapter, or one that hasn't been validated: this script always runs as a visitor
+		// (USERUID 0), so nobody gets an unvalidated chapter here
+		if(!$c || empty($c['validated'])) {
+			// printword.tpl has no {output}, so the message is printed into the document itself
+			echo write_error($c ? _ACCESSDENIED : _ERROR)."</body></html>";
 			exit( );
 		}
-		if($c['inorder'] == 1 && $storyinfo['storynotes']) {
+		if($c['inorder'] == 1 && !empty($storyinfo['storynotes'])) {
 			$tpl->newBlock("storynotes");
 			$tpl->assign( "storynotes", format_story($storyinfo['storynotes']));
 			$tpl->gotoBlock("_ROOT");
@@ -179,7 +193,7 @@ echo "</style></head>
 		$tpl->newBlock("chapterblock");
 		$tpl->assign("chaptertitle", $c['title']);
 		$tpl->assign("chapterauthor", $c['penname']);
-		if($c['notes']) {
+		if(!empty($c['notes'])) {
 			$tpl->newBlock("notes");
 			$tpl->assign( "notes", format_story($c['notes']));
 			$tpl->gotoBlock("chapterblock");
@@ -192,10 +206,7 @@ echo "</style></head>
 				exit( );
 			}
 			$file = _BASEDIR.STORIESPATH."/".$c['uid']."/".$c['chapid'].".txt";
-			$log_file = @fopen($file, "r");
-			$file_contents = @fread($log_file, filesize($file));
-			$story = $file_contents;
-			@fclose($log_file);
+			$story = is_file($file) ? (string)@file_get_contents($file) : "";
 		}
 		else $story = $c['storytext'];
 		// The following lines cleans up problems between pre-2.0 stories and 2.0 stories.  If there's html, don't send it through nl2br and then clean up smart quotes.

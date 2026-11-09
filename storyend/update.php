@@ -37,26 +37,37 @@ else include_once("languages/en.php");
 if(!isADMIN) accessDenied( );
 $confirm = isset($_GET['confirm']) ? $_GET['confirm'] : false;
 include("version.php");
+include_once(_BASEDIR."modules/storyend/functions.php");
 list($currentVersion) = dbrow(dbquery("SELECT version FROM ".TABLEPREFIX."fanfiction_modules WHERE name = 'Story End' LIMIT 1"));
+$currentVersion = (string)$currentVersion;
 $ver = explode(".", $currentVersion);
-if(empty($currentVersion ) || $ver[1] < 4) {
+$minor = isset($ver[1]) ? (int)$ver[1] : 0;
+if($currentVersion === "") $output = write_message(_MODNOTINSTALLED);
+else if(version_compare($currentVersion, $moduleVersion, "<")) {
 if($confirm == "yes") {
-	if($ver[1] < 2) {
+	// One run takes any older version to $moduleVersion; every step checks before it changes anything.
+	if($minor < 2) {
+		// 1.2: the story end also on the story index and the printer-friendly page
 		list($codeblocks) = dbrow(dbquery("SELECT COUNT(code_module) FROM ".TABLEPREFIX."fanfiction_codeblocks WHERE code_module = 'storyend'"));
 		if($codeblocks < 2) {
 			dbquery("INSERT INTO `".TABLEPREFIX."fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storyend/storyend.php\");', 'storyindex', 'storyend')");
 			dbquery("INSERT INTO `".TABLEPREFIX."fanfiction_codeblocks` (`code_text`, `code_type`, `code_module`) VALUES ( 'include(_BASEDIR.\"modules/storyend/storyend.php\");', 'printstory', 'storyend')");
 		}
-	    dbquery("UPDATE " . TABLEPREFIX . "fanfiction_modules SET version = '1.3' WHERE name = 'Story End' LIMIT 1");
 	}
-	elseif ($ver[1] < 4)
-	{
-
-		$check = dbassoc(dbquery("SHOW COLUMNS FROM " . TABLEPREFIX . "fanfiction_settings LIKE 'storyend'"));
-		if (!$check) dbquery("ALTER TABLE `" . TABLEPREFIX . "fanfiction_settings` ADD `storyend` TEXT NOT NULL default ''");
-
-		dbquery("UPDATE " . TABLEPREFIX . "fanfiction_modules SET version = '1.4' WHERE name = 'Story End' LIMIT 1");
+	if($minor < 4) {
+		// 1.4: options page, stored in the settings table
+		$check = dbassoc(dbquery("SHOW COLUMNS FROM " . $settingsprefix . "fanfiction_settings LIKE 'storyend'"));
+		if (!$check) dbquery("ALTER TABLE `" . $settingsprefix . "fanfiction_settings` ADD `storyend` TEXT NOT NULL default ''");
 	}
+	// 1.5 - 1.7: no database changes
+	if($minor < 8) {
+		// 1.8: options are stored as JSON; convert a value saved with serialize() by 1.4 - 1.7
+		list($storyend_raw) = dbrow(dbquery("SELECT storyend FROM " . $settingsprefix . "fanfiction_settings WHERE sitekey = '" . SITEKEY . "'"));
+		if(is_string($storyend_raw) && substr($storyend_raw, 0, 2) == "a:") {
+			dbquery("UPDATE " . $settingsprefix . "fanfiction_settings SET storyend = '" . escapestring(json_encode(storyend_options($storyend_raw))) . "' WHERE sitekey = '" . SITEKEY . "'");
+		}
+	}
+	dbquery("UPDATE " . TABLEPREFIX . "fanfiction_modules SET version = '" . escapestring($moduleVersion) . "' WHERE name = 'Story End' LIMIT 1");
 	$output = write_message(_ACTIONSUCCESSFUL);
 }
 else if($confirm == "no") {
@@ -66,7 +77,7 @@ else {
 	$output = write_message(_CONFIRMUPDATE."<br /><a href='update.php?confirm=yes'>"._YES."</a> "._OR." <a href='update.php?confirm=no'>"._NO."</a>");
 }
 }
-else write_message(_ALREADYUPDATED);
+else $output = write_message(_ALREADYUPDATED);
 $tpl->assign("output", $output);
 $tpl->printToScreen( );
 ?>
